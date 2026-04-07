@@ -2,7 +2,8 @@
 This project analyzes player performance in the 2024 NWSL season with custom metrics and regression models to identify key offensive contributors.
 
 # Dataset
-Sourced from Kaggle - NWSL 2024 Player Stats.
+Data sourced from Kaggle - 2024 NWSL Women's Soccer League Player Stats
+(Original dataset publicly available - credit to creator: Bree Nguyen)
 
 # How to Run
 1. Clone this repo
