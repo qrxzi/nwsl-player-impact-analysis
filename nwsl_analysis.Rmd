@@ -1,0 +1,175 @@
+Introduction
+This project analyzes 2024 NWSL player statistics to evaluate performance efficiency and identify key predictors of offensive success. The dataset includes 344 players across 40 performance variables.
+Missing values in games_started were interpreted as substitute appearances and replaced with 0. Players with fewer than 300 minutes were removed to prevent distortion in per-90 metrics.
+
+---
+title: "Player Impact and Efficiency Analysis: 2024 NWSL Season"
+author: "Zelda Natty"
+date: "2026-04-07"
+output: html_document
+---
+
+```{r setup, include=FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(ggplot2)
+library(readr)
+
+# Load data
+df <- read_csv("2024_nwsl_0525.csv")
+
+colnames(df)
+
+# Replace missing starts with 0
+df$games_started[is.na(df$games_started)] <- 0
+
+# Filter low-minute players and engineer features
+df <- df %>%
+  rename(
+    total_tackles = tackles...14,
+    tackle_percentage = tackles...35
+  )
+
+df <- df %>%
+  filter(minutes_played >= 300) %>%
+  mutate(
+    goal_conversion_rate =
+      if_else(total_scoring_attempts > 0,
+              goals / total_scoring_attempts,
+              0),
+    contribution_per_90 =
+      goals_avg_over_90_mins + assists_avg_over_90_mins
+  )
+```
+This project analyzes 2024 NWSL player statistics to evaluate performance efficiency and identify key predictors of offensive success. The dataset includes 344 players across 40 performance variables.
+Missing values in games_started were interpreted as substitute appearances and replaced with 0. Players with fewer than 300 minutes were removed to prevent distortion in per-90 metrics.
+
+1. Goals by Positions
+```{r}
+df %>%
+  group_by(position) %>%
+  summarise(avg_goals = mean (goals, na.rm = TRUE)) %>%
+  ggplot(aes(x = position, y = avg_goals)) +
+  geom_col() +
+  theme_minimal() +
+  labs (
+    title = "Average Goals by Position",
+    x = "Position",
+    y = "Average Goals"
+  )
+```
+Interpretation:
+Forwards demonstrate the highest average goal output, as expected. Midfielders contribute moderately, while defenders show minimal scoring output. This confirms positional role differentiation within offensive production.
+
+2. Contribution per 90 Minutes by Position
+```{r}
+ggplot(df, aes(x = position, y = contribution_per_90)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(
+    title = "Goal Contributions per 90 Minutes by Position",
+    x = "Position",
+    y = "Contributions per 90"
+  )
+```
+Interpretation:
+While forwards lead in median contribution, there is substantial variability within the position. Some midfielders exhibit comparable efficiency, indicating creative playmakers significantly influence offensive output.
+
+3. Minutes Played vs Goals
+```{r}
+ggplot(df, aes(x = minutes_played, y = goals)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_minimal() +
+  labs(
+    title = "Minutes Played vs Goals",
+    x = "Minutes Played",
+    y = "Goals"
+  )
+```
+Interpretation:
+There is a positive relationship between playing time and goals scored. However, variance suggests that opportunity alone does not guarantee scoring efficiency.
+
+4. Shot Volume vs Goal Conversion Rate
+```{r}
+ggplot(df, aes(x = total_scoring_attempts, y = goal_conversion_rate)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_minimal() +
+  labs(
+    title = "Shot Volume vs Goal Conversion Rate",
+    x = "Total Scoring Attempts",
+    y = "Goal Conversion Rate"
+  )
+```
+Interpretation:
+Players with higher shot volume do not always demonstrate higher conversion efficiency. This suggests that shot quality and positioning may be stronger indicators of elite finishing than volume alone.
+
+5. Player Impact Score
+```{r}
+# Standardize Key Performance Metrics
+df <- df %>%
+  mutate(
+    z_goals90 = scale(goals_avg_over_90_mins),
+    z_assists90 = scale(assists_avg_over_90_mins),
+    z_conversion = scale(goal_conversion_rate)
+  )
+
+# Create Player Impact Score
+df <- df %>%
+  mutate(
+    player_impact_score =
+      (0.5 * z_goals90) +
+      (0.3 * z_assists90) +
+      (0.2 * z_conversion)
+  )
+```
+
+6. View Top Players
+```{r}
+df %>%
+  arrange(desc(player_impact_score)) %>%
+  select(player_name, team, player_impact_score) %>%
+  head(10)
+```
+Goals are weighted at 50% due to their direct contribution to match outcomes. Assists were weighted at 30% to reflect play making value, while goal conversion efficiency was weighted at 20% to reward finishing quality.
+
+7. Visualizations
+```{r}
+top_players <- df %>%
+  arrange(desc(player_impact_score)) %>%
+  slice(1:10)
+
+ggplot(top_players,
+       aes(x = reorder(player_name, player_impact_score),
+           y = player_impact_score)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Top 10 NWSL Players by Offensive Impact Score (2024)",
+    x = "Player",
+    y = "Player Impact Score"
+  ) +
+  theme_minimal() +
+  theme (
+    plot.title = element_text(size = 14, face = "bold")
+  )
+```
+The visualization highlights the top 10 players based on the custom Player Impact Score. Players ranked highest demonstrate strong goal production combined with efficiency and assist contribution. This metirc provides a more comprehensive evaluation than goals alone.
+
+8. Predictive Model
+```{r}
+model <- lm(goals ~ total_scoring_attempts +
+              on_target_scoring_attempts +
+              accurate_shooting_percentage +
+              minutes_played,
+            data = df)
+
+summary(model)
+```
+Interpretation:
+Regression results indicate that total scoring attempts and shots on target are strong predictors of goal output. Shooting accuracy contributes additional explanatory power, reinforcing the importance of finishing efficiency.
+
+Conclusion
+Offensive performance in the 2024 NWSL season appears driven by a combination of shot volume and finishing efficiency. Players who generate high attempt volume while maintaining strong accuracy exhibit the greatest impact. While this analysis focused on offensive production, future research could incorporate defensive metrics and expected goals to create a more comprehensive player valuation model. Additionally, the weighted impact score could be refinded using machine learning optimization techniques. These findings provide a foundation for predictive scouting and performance evaluation.
